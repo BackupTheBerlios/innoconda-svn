@@ -1,8 +1,11 @@
+	* inno.fmlang.distutilsData for making data files compatible with
+	  distutils
+
 Innoconda (0.1.99)
-    * Now using Inno Setup version 4.2.2.
-    * inno.fmlang.sourceItems utility function
+	* Now using Inno Setup version 4.2.2.
+	* inno.fmlang.sourceItems utility function
 -- Cory Dodt (corydodt@twistedmatrix.com)
 
 Innoconda (0.1.97)
-    * Initial release.
+	* Initial release.
 -- Cory Dodt (corydodt@twistedmatrix.com)

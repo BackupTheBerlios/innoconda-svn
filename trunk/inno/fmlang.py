@@ -287,5 +287,21 @@ def sourceItems(fmscript, replaceDuplicates=0):
     fmp = FileMapperParser()
     fmp.replaceDuplicates = replaceDuplicates
     [fmp.onecmd(l) for l in fmscript.splitlines()]
-    return zip(*fmp.data.items())[0]
+    if fmp.data.items():
+        return zip(*fmp.data.items())[0]
+    else:
+        return []
 
+def distutilsData(fmscript, replaceDuplicates=0, prefix=''):
+    """Return a list of items compatible with distutils' datafiles setup arg:
+    [(dirname, (source_items_in_dirname)), ...]
+    
+    prefix is prepended to each dirname so you can control where they go after
+    installation.  (Does not take care of fixing distutils' brain-dead
+    handling of data files.   See Google for recipes to fix that. :-)
+    """
+    items = sourceItems(fmscript, replaceDuplicates)
+    thedirs = {}
+    for i in items:
+        thedirs.setdefault(str(path(i).dirname()), []).append(i)
+    return thedirs.items()
