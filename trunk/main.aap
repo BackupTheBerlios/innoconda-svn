@@ -17,7 +17,7 @@ innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/
         scr = inno.PythonScript(display_name="Innoconda", 
                                 name="innoconda",
                                 package_version=_no.version,)
-        scr.collect("inno", exclude_globs=('.cvsignore', '*CVS','*~','*.pyc'))
+        scr.collect("inno", exclude_globs=('.cvsignore', '*CVS*','*~','*.pyc'))
         scr.compile()
 
 clean:

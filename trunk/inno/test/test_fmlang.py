@@ -32,7 +32,7 @@ class FMLangTestCase(unittest.TestCase):
                     '.\\data\\CVS\\Repository', '.\\data\\CVS\\Root',
                     '.\\data\\simple.iss', '.\\test_fmlang.py',
                     '.\\test_fmlang.py~', '.\\test_inno.py', '.\\__init__.py',
-                    '.\\Entries', '.\\Repository', '.\\Root')
+                    '.\\Entries', '.\\Repository', '.\\Root', '.\\dir2\\z')
         actual = zip(*self.fmp.data.items())[0]
         self.assertEqual(expected, actual)
     def test_001invalidDir(self):
@@ -71,5 +71,11 @@ chdir test
 recurse *
 chdir ../CVS
 recurse # does this parse ok?
+chdir ../dir
+exclude *dir2*
+recurse
+unexclude *dir2*
+exclude [xy]
+recurse
 # show
 '''

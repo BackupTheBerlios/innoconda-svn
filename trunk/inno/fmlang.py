@@ -37,7 +37,7 @@ identical to "(dir)add *" and "(dir)recurse *", respectively.
 are only needed when you have empty directories to add.  "add" and "recurse"
 keep the directory structure but only add the files.
 
-3. Shell matching of hidden files (named with a leading dot) do not
+3. Shell matching of hidden files (named with a leading dot) does not
 apply: * matches them.  Use "exclude .*" to exclude them.
 
 4. The first quoted word after the command is taken as the glob pattern, and
@@ -76,6 +76,8 @@ import os
 import cmd
 import shlex
 from cStringIO import StringIO
+import re
+import fnmatch
 
 from inno.path import path
 
@@ -123,7 +125,6 @@ class OrderedDict(dict):
         del self[k]
         return k, v
 
-
 def matches(funk, curdir, glob, xglobs=()):
     """Return the entries that match glob and do not match any xglob"""
     old = os.getcwd()
@@ -134,8 +135,11 @@ def matches(funk, curdir, glob, xglobs=()):
         all = getattr(dn, funk)(bn)
         allcopy = list(all)
         for xg in xglobs:
+            # recreating the re every time is probably slow, but I
+            # resist the urge to prematurely optimize!
+            xg_re = fnmatch.translate(xg)
             for f in allcopy[:]:
-                if f.fnmatch(xg):
+                if re.match(xg_re, f) or f.fnmatch(xg):
                     allcopy.remove(f)
         return [(str(f)+ os.sep * f.isdir(), # add a slash to dirs
                 str(f.abspath())) for f in allcopy
@@ -164,11 +168,6 @@ def cleanLine(line):
         arg = arg[1:-1]
     return ' '.join((cmd, arg))
 
-def xparseLine(line):
-    pos = line.find(' ')
-    word1 = line[:pos]
-    word2 = line[pos+1:]
-    return word1 or None, word2 or None, line.strip()
 
 class FileMapperParser(cmd.Cmd):
     
@@ -180,7 +179,11 @@ class FileMapperParser(cmd.Cmd):
         self.cwd = path('.')
 
     def parseline(self, line):
-        return xparseLine(cleanLine(line))
+        line = cleanLine(line)
+        pos = line.find(' ')
+        word1 = line[:pos]
+        word2 = line[pos+1:]
+        return word1 or None, word2 or None, line.strip()
 
     def _update(self, dct):
         if not self.replaceDuplicates:

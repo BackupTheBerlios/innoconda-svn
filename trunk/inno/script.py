@@ -1,6 +1,4 @@
 """Create (very basic) Inno Setup scripts from parameters"""
-from __future__ import generators
-
 # stdlib imports
 import os
 from cStringIO import StringIO
@@ -67,17 +65,12 @@ several directories.
 packaged (dirs or files)
 @type exclude_globs: iterable
 """
-        scr = []
-        
-        self._base = psrc = path(src)
-        assert psrc.isdir()
-
         fmp = FileMapperParser()
         do = fmp.onecmd
         
-        do("chdir %s" % src)
+        do("chdir '%s'" % src)
         for xg in exclude_globs:
-            do("exclude %s" % xg)
+            do("exclude '%s'" % xg)
 
         if recurse and not empties:
             do("recurse")
@@ -88,9 +81,7 @@ packaged (dirs or files)
         elif not recurse and empties:
             do("add"); do("diradd")
 
-        # put only the destinations in self.sources, we assume
-        # that everything is relative to _base so we can discard sources
-        self.sources = zip(*fmp.data.items())[0]
+        self.sources = fmp.data.items()
         
     def writeScript(self, fd):
         """Serialize script to fd
@@ -101,14 +92,12 @@ packaged (dirs or files)
 
     def _section_Setup(self, fd):
         w = fd.write
-        self._options['absbase'] = self._base.abspath()
         self._options['workdir'] = os.getcwd()
         w("""\
 [Setup]
 AppName=%(display_name)s
 AppVerName=%(display_name)s %(package_version)s
 DefaultDirName=%(destination)s
-SourceDir=%(absbase)s
 OutputBaseFilename=%(name)s-%(package_version)s-setup
 DefaultGroupName=%(display_name)s
 OutputDir=%(workdir)s
@@ -122,23 +111,18 @@ OutputDir=%(workdir)s
         w("[Files]\n")
 
         tmpl = 'Source: "%s"; DestDir: "{app}\%s"; Flags: ignoreversion\n'
-        for f in self.sources:
-            pf = path(f)
-            if pf.isfile():
-                source = self._base.relpathto(pf)
-                w(tmpl % (source, os.path.dirname(source)))
-    
+        for dest, src in self.sources:
+            if path(src).isfile():
+                w(tmpl % (src, path(dest).dirname()))
+
     def _section_Dirs(self, fd):
         w = fd.write
         w("[Dirs]\n")
 
         tmpl = 'Name: "{app}\%s"\n'
-        for d in self.sources:
-            pd = path(d)
-            if pd.isdir():
-                ## FIXME? 2 leading slashes is bad, might have to clean up
-                source = self._base.relpathto(pd)
-                w(tmpl % source)
+        for dest, src in self.sources:
+            if path(dest).isdir():
+                w(tmpl % dest)
 
     def _section_Icons(self, fd):
         w = fd.write
@@ -188,11 +172,9 @@ NoUninstallWarning=Setup has detected that this package has already been install
         w("[Files]\n")
 
         tmpl = 'Source: "%s"; DestDir: "{code:SiteLib}\%s"; Flags: ignoreversion\n'
-        for f in self.sources:
-            pf = path(f)
-            if pf.isfile():
-                source = self._base.relpathto(pf)
-                w(tmpl % (source, os.path.dirname(source)))
+        for dest, src in self.sources:
+            if path(src).isfile():
+                w(tmpl % (src, path(dest).dirname()))
 
     def _section_Setup(self, fd):
         Script._section_Setup(self, fd)
