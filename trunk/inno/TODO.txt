@@ -1,0 +1,5 @@
+1. Give PythonScript support for extension modules - invoke distutils
+to compile, create separate distributions for each python etc.
+2. Give PythonScript support for adding icons to documentation.
+3. Give PythonScript support for scripts?
+4. Pythonic way to add icons

@@ -3,20 +3,20 @@
 @execfile("inno/version.py", globs)
 version = `globs['version']`
 
-all_targets = Innoconda-$version-setup.exe
+all_targets = innoconda-$version-setup.exe
 
 all: $all_targets
     :print :Done with $source
 
-Innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/~moonfallen/innosetup409.zip}
+innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/~moonfallen/innosetup409.zip}
     :pushdir inno
     :sys unzip -oq ../innosetup409.zip
     :popdir
     :python
         import inno
-        scr = inno.Script(display_name="Innoconda", 
-                          name="innoconda",
-                          package_version=_no.version,
-                          destination="{code:PythonDir}\inno")
-        scr.collect("inno", exclude_globs=('*CVS',))
+        scr = inno.PythonScript(display_name="Innoconda", 
+                                name="innoconda",
+                                package_version=_no.version,
+                                destination="{pf}\Innoconda")
+        scr.collect("inno", exclude_globs=('.cvsignore', '*CVS','*~'))
         scr.compile()

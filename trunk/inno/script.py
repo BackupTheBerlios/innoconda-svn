@@ -11,11 +11,31 @@ import types
 from inno.path import path
 import inno
 
-def dumbPrefixedMethods(instance, prefix):
-    klass = instance.__class__
-    for name, obj in klass.__dict__.items():
-        if type(obj) is types.FunctionType and name.startswith(prefix):
-            yield getattr(instance, name)
+
+def prefixedMethods(obj, prefix):
+    """A list of methods with a given prefix on a given instance.
+    """
+    dct = {}
+    accumulateMethods(obj, dct, prefix)
+    return dct.values()
+
+def accumulateMethods(obj, dict, prefix='', curClass=None):
+    """accumulateMethods(instance, dict, prefix)
+    I recurse through the bases of instance.__class__, and add methods
+    beginning with 'prefix' to 'dict', in the form of
+    {'methodname':*instance*method_object}.
+    """
+    if not curClass:
+        curClass = obj.__class__
+    for base in curClass.__bases__:
+        accumulateMethods(obj, dict, prefix, base)
+
+    for name, method in curClass.__dict__.items():
+        optName = name[len(prefix):]
+        if ((type(method) is types.FunctionType)
+            and (name[:len(prefix)] == prefix)
+            and (len(optName))):
+            dict[optName] = getattr(obj, name)
 
 class Script:
     """A scriptable inno setup script (.iss).
@@ -34,7 +54,7 @@ class Script:
         self.sources = []
 
     def collect(self, src, recurse=1, empties=1, exclude_globs=()):
-        """Use files in src as the content of the Inno script.
+        """Add files in src as contents of the Inno package.
 The script will use every file in that directory, and (by default) its
 subdirectories.  You can call this more than once to collect
 several directories.
@@ -69,6 +89,10 @@ packaged (dirs or files)
         """Serialize script to fd
         @param fd: filelike object with write() method
         """
+        for m in prefixedMethods(self, "_section_"):
+            m(fd)
+
+    def _section_Setup(self, fd):
         w = fd.write
         self._options['absbase'] = self._base.abspath()
         self._options['workdir'] = os.getcwd()
@@ -84,8 +108,7 @@ OutputDir=%(workdir)s
 """ % self._options)
         if not self.uninstallable:
             w("Uninstallable=false")
-        for m in dumbPrefixedMethods(self, "_section_"):
-            m(fd)
+        
 
     def _section_Files(self, fd):
         w = fd.write
@@ -115,16 +138,97 @@ OutputDir=%(workdir)s
             w('Name: "{group}\Uninstall %s"; Filename: "{uninstallexe}"\n' %
               self.display_name)
 
-    def compile(self, noTemporary=1):
+    def compile(self, temporary=0):
         """Generate the script file and send it to iscc
-        @param noTemporary: give the .iss file a real name and don't delete
-        it
+        @param temporary: use a temp file for the iss
         """
-        if noTemporary:
-            out = file("%s.iss" % self.name, 'w+')
-        else:
+        if temporary:
             out = tempfile.NamedTemporaryFile(suffix='.iss', mode='w+')
+        else:
+            out = file("%s.iss" % self.name, 'w+')
         name = out.name
         self.writeScript(out)
         out.close()
         inno.build(name)
+
+class PythonScript(Script):
+    def _section_Types(self, fd):
+        fd.write('''\
+[Types]
+Name: "2.2"; Description: "Install for Python 2.2"; Check: Python22Available
+Name: "2.3"; Description: "Install for Python 2.3"; Check: Python23Available
+''')
+    def _section_Components(self, fd):
+        fd.write('''\
+[Components]
+Name: "python2.2"; Description: "Python 2.2"; Types: 2.2; Flags: exclusive
+Name: "python2.3"; Description: "Python 2.3"; Types: 2.3; Flags: exclusive
+''')
+    def _section_Messages(self, fd):
+        fd.write('''\
+[Messages]
+WizardSelectComponents=Select Python Version
+SelectComponentsDesc=For which Python version will you install this package?
+SelectComponentsLabel2=Select a version of Python.
+NoUninstallWarningTitle=Previously Installed
+NoUninstallWarning=Setup has detected that this package has already been installed for:%n%1%n%nIf you later uninstall this package, both versions wil be uninstalled at once.%nSelect "Yes" to continue (this is safe).
+''')
+
+    def _section_Files(self, fd):
+        w = fd.write
+        w("[Files]\n")
+
+        tmpl = 'Source: "%s"; DestDir: "{code:SiteLib}\%s"; Flags: ignoreversion\n'
+        for f in self.sources:
+            if f.isfile():
+                source = self._base.relpathto(f)
+                w(tmpl % (source, os.path.dirname(source)))
+
+    def _section_Setup(self, fd):
+        Script._section_Setup(self, fd)
+        fd.write("DisableDirPage=yes\n")
+
+    def _section_Code(self, fd):
+        fd.write(r"""[Code]
+var
+  selectedPythonDir: String;
+
+function findPython(version: String): String;
+begin
+   {try HKLM first and then fall back to HKCU for location of Python}
+   Result := ExpandConstant('{reg:HKLM\Software\Python\PythonCore\' + version + '\InstallPath,|ACK}')
+   if CompareStr(Result, 'ACK')=0 then
+      Result := ExpandConstant('{reg:HKCU\Software\Python\PythonCore\' + version + '\InstallPath,|ACK}');
+end;
+
+function SiteLib(Default: String): String;
+begin
+  selectedPythonDir := findPython(WizardSetupType(False));
+  Result := selectedPythonDir + '\lib\site-packages\inno';
+end;
+
+function Python22Available(): Boolean;
+begin
+  Result := True;
+  if CompareStr(findPython('2.2'), 'ACK')=0 then
+    Result := False;
+end;
+
+function Python23Available(): Boolean;
+begin
+  Result := True;
+  if CompareStr(findPython('2.3'), 'ACK')=0 then
+    Result := False;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+  if not Python22Available and not Python23Available then
+  begin;
+    MsgBox('No versions of Python were found.  Cannot continue.', mbCriticalError, MB_OK);
+    Result:=False;
+  end;
+end;
+
+""")
