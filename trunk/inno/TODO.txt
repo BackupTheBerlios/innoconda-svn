@@ -1,8 +1,7 @@
-1. Method on Script to collect files from a fmlang script
-2. Pythonic way to add icons
-3. Support modifying the PATH environment variable.
-4. Give PythonScript support for extension modules - invoke distutils
+1. Pythonic way to add icons
+2. Support modifying the PATH environment variable.
+3. Give PythonScript support for extension modules - invoke distutils
 to compile, create separate distributions for each python etc.
-5. Give PythonScript support for adding icons to documentation.
-6. Give PythonScript support for scripts?
-7. Script file parsing so you can load an .iss, modify it, and re-save it
+4. Give PythonScript support for adding icons to documentation.
+5. Give PythonScript support for scripts?
+6. Script file parsing so you can load an .iss, modify it, and re-save it

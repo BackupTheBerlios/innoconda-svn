@@ -1,14 +1,27 @@
 
 @globs = {}
 @execfile("inno/version.py", globs)
-version = `globs['version']`
+version =           `globs['version']`
 
-all_targets = innoconda-$version-setup.exe
+# find .py files that may change, requiring a rebuild
+@from inno.fmlang import FileMapperParser
+@fmp = FileMapperParser()
+@fm_script = """chdir inno
+@            recurse *.py
+@            add LICENSE.*
+@            add *.txt
+@            add test/data/test_fmlang.zip
+@            add test/data/simple.iss"""
+@[fmp.onecmd(l) for l in fm_script.split("\n")]
+@items = ' '.join(zip(*fmp.data.items())[0])
+package_files =     inno/$*items
+
+all_targets =       innoconda-$version-setup.exe
 
 all: $all_targets
     :print :Done with $source
 
-innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/~moonfallen/innosetup409.zip}
+innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/~moonfallen/innosetup409.zip} $(package_files)
     :pushdir inno
     :sys unzip -oq ../innosetup409.zip
     :popdir

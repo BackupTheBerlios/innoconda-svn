@@ -233,7 +233,6 @@ class FileMapperParser(cmd.Cmd):
         """add all files matching this glob, in this dir and subdirectories
         unexclude
         """
-        if glob=='QuotientService': import XXXFIXMEXXX
         if glob in ('', None): glob = '*'
         od = OrderedDict(deepmatchesf(self.cwd, glob, self.exclusions))
         self._update(od)

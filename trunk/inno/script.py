@@ -49,9 +49,21 @@ class Script:
         for a in self._required: setattr(self, a, options[a])
         self.uninstallable = options.get('uninstallable', 1)
         if not options.get('destination', None):
-            options['destination']=r"{pf}\%(name)s" % options
+            options['destination'] = r"{pf}\%(name)s" % options
         self._options = options
         self.sources = []
+        self.fmscript = None
+
+    def runFileCommands(self):
+        """Process self.fmscript as a FileMapper script (fmlang.py),
+        storing the result in self.sources
+        """
+        fmp = FileMapperParser()
+        for line in self.fmscript.split('\n'):
+            fmp.onecmd(line)
+        
+        self.sources = fmp.data.items()
+        
 
     def collect(self, src, recurse=1, empties=1, exclude_globs=()):
         """Add files in src as contents of the Inno package.
@@ -61,12 +73,12 @@ several directories.
 @param src: stuff to package
 @param recurse: Whether to descend subdirectories
 @param empties: Whether to keep empty directories in the package
-@param exclude_globs: list of patterns relative to src which will be
-packaged (dirs or files)
+@param exclude_globs: list of patterns relative to src which will *not* be
+packaged
 @type exclude_globs: iterable
 """
-        fmp = FileMapperParser()
-        do = fmp.onecmd
+        scx = []
+        do = scx.append
         
         do("chdir '%s'" % src)
         for xg in exclude_globs:
@@ -81,7 +93,9 @@ packaged (dirs or files)
         elif not recurse and empties:
             do("add"); do("diradd")
 
-        self.sources = fmp.data.items()
+        self.fmscript = '\n'.join(scx)
+
+        self.runFileCommands()
         
     def writeScript(self, fd):
         """Serialize script to fd

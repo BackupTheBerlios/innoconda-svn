@@ -15,10 +15,9 @@ class FMLangTestCase(unittest.TestCase):
         zipf = util.sibpath(__file__, "data/test_fmlang.zip")
         unzip(zipf, overwrite=1)
     def test_000collecting(self):
-        scr = script_t % {'teststage': os.getcwd()}
         self.fmp.replaceDuplicates = 1
-        for l in scr.split('\n'):
-            self.fmp.onecmd(l)
+        do = self.fmp.onecmd
+        ckitems = lambda : zip(*self.fmp.data.items())[0]
         expected = (".\\'", '.\\ x y z', '.\\LICENSE.inno',
                     '.\\LICENSE.innoconda', '.\\LICENSE.process',
                     '.\\actual.txt', '.\\files.txt', '.\\output.txt',
@@ -32,9 +31,42 @@ class FMLangTestCase(unittest.TestCase):
                     '.\\data\\CVS\\Repository', '.\\data\\CVS\\Root',
                     '.\\data\\simple.iss', '.\\test_fmlang.py',
                     '.\\test_fmlang.py~', '.\\test_inno.py', '.\\__init__.py',
-                    '.\\Entries', '.\\Repository', '.\\Root', '.\\dir2\\z')
-        actual = zip(*self.fmp.data.items())[0]
-        self.assertEqual(expected, actual)
+                    '.\\Entries', '.\\Repository', '.\\Root', '.\\dir3\\1',
+                    '.\\dir2\\z')
+        do('exclude *.pyc')
+        do('add "\'"')
+        self.assertEqual(expected[:1], ckitems())
+        do("add ' x y z' # spaces!")
+        self.assertEqual(expected[1:2], ckitems()[1:2])
+        do("exclude  *.pyo")
+        do('chdir "%s" ' % os.getcwd())
+        do("add LICENSE.* # woo licenses add stuff")
+        self.assertEqual(expected[2:5], ckitems()[2:5])
+        do("# comment ")
+        do(" add *.txt")
+        self.assertEqual(expected[5:10], ckitems()[5:10])
+        do("  diradd program  ")
+        self.assertEqual(expected[10:11], ckitems()[10:11])
+        do("recurse *.py*")
+        self.assertEqual(expected[11:22], ckitems()[11:22])
+        do("chdir test")
+        do("recurse *")
+        self.assertEqual(expected[22:33], ckitems()[22:33])
+        do("chdir ../CVS")
+        do("recurse # does this parse ok?")
+        self.assertEqual(expected[33:36], ckitems()[33:36])
+        do("chdir ../dir")
+        do("exclude *dir2*")
+        do("recurse")
+        self.assertEqual(expected[36:37], ckitems()[36:37])
+        do("unexclude *dir2* ")
+        do("exclude [xy]")
+        do("recurse")
+        do("")
+        do("# show")
+        self.assertEqual(expected[37:38], ckitems()[37:38])
+        self.assertEqual(expected, ckitems())
+
     def test_001invalidDir(self):
         self.fmp.replaceDuplicates = 0
         try:
@@ -43,7 +75,7 @@ class FMLangTestCase(unittest.TestCase):
             pass
         else:
             self.fail("\
-Changing to invalid directory foo should have raised Exception")
+Changing to invalid directory foo should have raised exception")
     def test_002duplicates(self):
         self.fmp.onecmd("cd ../test")
         try:
@@ -53,29 +85,20 @@ Changing to invalid directory foo should have raised Exception")
         else:
             self.fail("\
 Adding new __init__.py in no-replaceDuplicates mode did not raise exception")
+    def test_003dirSelection(self):
+        """Test that directories unadorned by / are treated like directories,
+        and globs of directories work
+        """
+        fmp1 = FileMapperParser()
+        fmp1.onecmd("chdir dir")
+        fmp1.onecmd("recurse dir2")
+        expected = ('.\\dir2\\x', '.\\dir2\\y', '.\\dir2\\z')
+        actual = zip(*fmp1.data.items())[0]
+        self.assertEqual(actual, expected)
         
-
-
-script_t = '''\
-exclude *.pyc
-add "\'"
-add ' x y z' # spaces!
-exclude  *.pyo
-chdir "%(teststage)s"
-add LICENSE.* # woo licenses add stuff
-# comment
-add *.txt
-  diradd program
-recurse *.py*
-chdir test
-recurse *
-chdir ../CVS
-recurse # does this parse ok?
-chdir ../dir
-exclude *dir2*
-recurse
-unexclude *dir2*
-exclude [xy]
-recurse
-# show
-'''
+        fmp2 = FileMapperParser()
+        fmp2.onecmd("recurse dir/dir*")
+        expected = ('.dir\\\\dir2\\x', '.dir\\\\dir2\\y', '.\\dir\\dir2\\z',
+                    '.\\dir\\dir3\\1') 
+        actual = zip(*fmp2.data.items())[0]
+        self.assertEqual(actual, expected)
