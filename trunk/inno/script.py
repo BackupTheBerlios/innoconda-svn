@@ -41,15 +41,16 @@ class Script:
     """A scriptable inno setup script (.iss).
     >>> from inno import Script
     >>> s = Script(display_name=\"My Program\", name=\"myprogram\",
-    package_version=\"1.0\", destination=\"{pf}\myprogram\")
+    package_version=\"1.0\")
     >>> s.collect(\"myprogram\") # add files to the package
     >>> s.compile() # run inno on the package
     """
-    _required = ('display_name', 'name', 'package_version',
-                 'destination',)
+    _required = ('display_name', 'name', 'package_version',)
     def __init__(self, **options):
         for a in self._required: setattr(self, a, options[a])
         self.uninstallable = options.get('uninstallable', 1)
+        if not options.get('destination', None):
+            options['destination']=r"{pf}\%(name)s" % options
         self._options = options
         self.sources = []
 
