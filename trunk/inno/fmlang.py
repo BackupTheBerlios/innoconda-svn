@@ -156,7 +156,7 @@ def cleanLine(line):
     sio = StringIO(line)
     lexer = shlex.shlex(sio)
     lexer.wordchars = wordchars
-    #lexer.debug = 1
+    # lexer.debug = 1
     gt = lexer.get_token
     # in non-posix shlex returns None for EOF, so kludge with {or ''}
     # try posix?

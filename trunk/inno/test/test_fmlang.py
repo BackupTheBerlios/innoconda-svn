@@ -61,7 +61,7 @@ exclude *.pyc
 add "\'"
 add ' x y z' # spaces!
 exclude  *.pyo
-chdir %(teststage)s
+chdir "%(teststage)s"
 add LICENSE.* # woo licenses add stuff
 # comment
 add *.txt
