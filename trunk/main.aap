@@ -31,5 +31,11 @@ innoconda-$version-setup.exe: innosetup422.zip{fetch = http://pbp.berlios.de/inn
         scr.collect("inno", exclude_globs=('*.svn*','*~','*.pyc'))
         scr.compile()
 
+svn-install:
+    @from distutils import sysconfig as s
+    @site_packages = s.get_config_var('LIBDEST') + os.sep + 'site-packages'
+    :del {r}{f} $site_packages/inno
+    :sys svn export inno $site_packages/inno
+
 clean:
     :del {f} $all_targets innoconda.iss
