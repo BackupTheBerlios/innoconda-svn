@@ -92,11 +92,14 @@ class OrderedDict(dict):
         for k, v in t:
             self[k] = v
         
-    def __setitem__(self, k, v):
-        # Replacing items changes the order, so don't replace items
-        if k in self and v==self[k]:
+    def __setitem__(self, k, v): 
+        # Replacing items with the same value changes the order, so don't
+        # replace items 
+        if k in self.keys() and v==self[k]:
             return
         dict.__setitem__(self, k, v)
+        if k in self.order:
+            self.order.remove(k)
         self.order.append(k)
     def __delitem__(self, k):
         dict.__delitem__(self, k)
