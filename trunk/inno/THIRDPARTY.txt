@@ -1,0 +1,11 @@
+
+Innoconda includes source from the following third parties:
+
+- process.py (c) ActiveState
+License in LICENSE.process
+
+- Inno Setup (c) Jordan Russell
+License in LICENSE.inno
+
+- path.py written by Jason Orendorff
+(apparently public domain)
