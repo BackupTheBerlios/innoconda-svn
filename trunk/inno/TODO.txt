@@ -5,3 +5,5 @@ to compile, create separate distributions for each python etc.
 4. Give PythonScript support for adding icons to documentation.
 5. Give PythonScript support for scripts?
 6. Script file parsing so you can load an .iss, modify it, and re-save it
+7. "prepend" command for fmlang, so you can add a file in ., but have
+it end up in prefix/.
