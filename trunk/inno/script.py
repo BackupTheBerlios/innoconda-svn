@@ -79,7 +79,12 @@ packaged
 """
         scx = []
         do = scx.append
-        
+
+        do("""\
+# Commands: add chdir diradd exclude show unexclude
+# Use "add **/*" to add recursively (recursive in subdirectories works
+#   too)
+""")
         do("chdir '%s'" % src)
         for xg in exclude_globs:
             do("exclude '%s'" % xg)
