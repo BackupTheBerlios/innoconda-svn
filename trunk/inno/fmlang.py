@@ -159,7 +159,6 @@ def cleanLine(line):
     # lexer.debug = 1
     gt = lexer.get_token
     # in non-posix shlex returns None for EOF, so kludge with {or ''}
-    # try posix?
     cmd, arg = gt() or '', gt() or ''
     if len(arg)>=1 and arg[0] in lexer.quotes:
         arg = arg[1:-1]
