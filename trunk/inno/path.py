@@ -12,26 +12,28 @@ This module requires Python 2.2 or later.
 
 URL:     http://www.jorendorff.com/articles/python/path
 Author:  Jason Orendorff <jason@jorendorff.com> (and others - see the url!)
-Date:    23 Feb 2003
+Date:    29 Feb 2004
 """
 
 
 # TODO
-#   - Is __iter__ worth the trouble?  It breaks the sequence
-#     protocol and breaks compatibility with str/unicode.
-#   - Perhaps support arguments to touch().
-#   - Note:  __add__() technically has a bug, I think, where
-#     it doesn't play nice with other types that implement
-#     __radd__().  Test this.
+#   - Bug in write_text().  It doesn't support Universal newline mode.
 #   - Better error message in listdir() when self isn't a
 #     directory. (On Windows, the error message really sucks.)
 #   - Make sure everything has a good docstring.
+#   - Add methods for regex find and replace.
+#   - guess_content_type() method?
+#   - Perhaps support arguments to touch().
+#   - Could add split() and join() methods that generate warnings.
+#   - Note:  __add__() technically has a bug, I think, where
+#     it doesn't play nice with other types that implement
+#     __radd__().  Test this.
 
 from __future__ import generators
 
 import sys, os, fnmatch, glob, shutil, codecs
 
-__version__ = '1.2'
+__version__ = '2.0.2'
 __all__ = ['path']
 
 # Pre-2.3 support.  Are unicode filenames supported?
@@ -65,9 +67,6 @@ class path(_base):
 
     def __repr__(self):
         return 'path(%s)' % _base.__repr__(self)
-
-    def __iter__(self):
-        return iter(self.listdir())
 
     # Adding a path and a string yields a path.
     def __add__(self, more):
@@ -114,6 +113,9 @@ class path(_base):
         """
         return self.expandvars().expanduser().normpath()
 
+    def _get_namebase(self):
+        base, ext = os.path.splitext(self.name)
+        return base
 
     def _get_ext(self):
         f, ext = os.path.splitext(_base(self))
@@ -123,15 +125,37 @@ class path(_base):
         drive, r = os.path.splitdrive(self)
         return path(drive)
 
-    parent = property(dirname)
-    name = property(basename)
+    parent = property(
+        dirname, None, None,
+        """ This path's parent directory, as a new path object.
+
+        For example, path('/usr/local/lib/libpython.so').parent == path('/usr/local/lib')
+        """)
+
+    name = property(
+        basename, None, None,
+        """ The name of this file or directory without the full path.
+
+        For example, path('/usr/local/lib/libpython.so').name == 'libpython.so'
+        """)
+
+    namebase = property(
+        _get_namebase, None, None,
+        """ The same as path.name, but with one file extension stripped off.
+
+        For example, path('/home/guido/python.tar.gz').name     == 'python.tar.gz',
+        but          path('/home/guido/python.tar.gz').namebase == 'python.tar'
+        """)
+
     ext = property(
         _get_ext, None, None,
         """ The file extension, for example '.py'. """)
+
     drive = property(
         _get_drive, None, None,
         """ The drive specifier, for example 'C:'.
-        This is always empty on systems that don't use drive specifiers. """)
+        This is always empty on systems that don't use drive specifiers.
+        """)
 
     def splitpath(self):
         """ p.splitpath() -> Return (p.parent, p.name). """
@@ -139,16 +163,39 @@ class path(_base):
         return path(parent), child
 
     def splitdrive(self):
+        """ p.splitdrive() -> Return (p.drive, <the rest of p>).
+
+        Split the drive specifier from this path.  If there is
+        no drive specifier, p.drive is empty, so the return value
+        is simply (path(''), p).  This is always the case on Unix.
+        """
         drive, rel = os.path.splitdrive(self)
         return path(drive), rel
 
     def splitext(self):
+        """ p.splitext() -> Return (p.stripext(), p.ext).
+
+        Split the filename extension from this path and return
+        the two parts.  Either part may be empty.
+
+        The extension is everything from '.' to the end of the
+        last path segment.  This has the property that if
+        (a, b) == p.splitext(), then a + b == p.
+        """
         # Cast to plain string using _base because Python 2.2
         # implementations of os.path.splitext use "for c in path:..."
         # which means something different when applied to a path
         # object.
         filename, ext = os.path.splitext(_base(self))
         return path(filename), ext
+
+    def stripext(self):
+        """ p.stripext() -> Remove one file extension from the path.
+
+        For example, path('/home/guido/python.tar.gz').stripext()
+        returns path('/home/guido/python.tar').
+        """
+        return self.splitext()[0]
 
     if hasattr(os.path, 'splitunc'):
         def splitunc(self):
@@ -292,7 +339,7 @@ class path(_base):
         This performs a depth-first traversal of the directory tree.
         Each directory is returned just before all its children.
         """
-        for child in self:
+        for child in self.listdir():
             if pattern is None or child.fnmatch(pattern):
                 yield child
             if child.isdir():
@@ -307,12 +354,11 @@ class path(_base):
         example, mydir.walkdirs('*test') yields only directories
         with names ending in 'test'.
         """
-        for child in self:
-            if child.isdir():
-                if pattern is None or child.fnmatch(pattern):
-                    yield child
-                for subsubdir in child.walkdirs(pattern):
-                    yield subsubdir
+        for child in self.dirs():
+            if pattern is None or child.fnmatch(pattern):
+                yield child
+            for subsubdir in child.walkdirs(pattern):
+                yield subsubdir
 
     def walkfiles(self, pattern=None):
         """ D.walkfiles() -> iterator over files in D, recursively.
@@ -322,7 +368,7 @@ class path(_base):
         mydir.walkfiles('*.tmp') yields only files with the .tmp
         extension.
         """
-        for child in self:
+        for child in self.listdir():
             if child.isfile():
                 if pattern is None or child.fnmatch(pattern):
                     yield child
@@ -349,13 +395,33 @@ class path(_base):
         return map(path, glob.glob(_base(self / pattern)))
 
 
-    # --- Reading an entire file at once.
+    # --- Reading or writing an entire file at once.
+
+    def open(self, mode='r'):
+        """ Open this file.  Return a file object. """
+        return file(self, mode)
 
     def bytes(self):
         """ Open this file, read all bytes, return them as a string. """
-        f = file(self, 'rb')
+        f = self.open('rb')
         try:
             return f.read()
+        finally:
+            f.close()
+
+    def write_bytes(self, bytes, append=False):
+        """ Open this file and write the given bytes to it.
+
+        Default behavior is to overwrite any existing file.
+        Call this with write_bytes(bytes, append=True) to append instead.
+        """
+        if append:
+            mode = 'ab'
+        else:
+            mode = 'wb'
+        f = self.open(mode)
+        try:
+            f.write(bytes)
         finally:
             f.close()
 
@@ -376,7 +442,7 @@ class path(_base):
         """
         if encoding is None:
             # 8-bit
-            f = file(self, _textmode)
+            f = self.open(_textmode)
             try:
                 return f.read()
             finally:
@@ -391,6 +457,57 @@ class path(_base):
             finally:
                 f.close()
             return t.replace(u'\r\n', u'\n').replace(u'\r', u'\n')
+
+    def write_text(self, text, encoding=None, errors='strict', append=False):
+        """ Write the given text to this file.
+
+        The default behavior is to overwrite any existing file;
+        to append instead, use the 'append=True' keyword argument.
+
+        There are two differences between path.write_text() and
+        path.write_bytes(): Unicode handling and newline handling.
+
+        --- Unicode
+
+        If 'text' isn't Unicode, this essentially just does
+        open(self, 'w').write(text).  The 'encoding' and 'errors'
+        arguments are ignored.
+
+        If 'text' is Unicode, it is first converted to bytes using the
+        specified 'encoding' (or the default encoding if 'encoding'
+        isn't specified).  The 'errors' argument applies only to this
+        conversion.
+
+        --- Newlines
+
+        write_text() converts from programmer-friendly newlines
+        (always '\n') to platform-specific newlines (see os.linesep;
+        on Windows, for example, the end-of-line marker is '\r\n').
+        This applies to Unicode text the same as to 8-bit text.
+
+        Because of this conversion, the text should only contain plain
+        newlines ('\n'), just like the return value of path.text().
+        If the text contains the characters '\r\n', it may be written
+        as '\r\r\n' or '\r\r' depending on your platform.  (This is
+        exactly the same as when you open a file for writing with
+        fopen(filename, "w") in C or file(filename, 'w') in Python.)
+        """
+        if isinstance(text, unicode):
+            text = text.replace(u'\n', os.linesep)
+            if encoding is None:
+                encoding = sys.getdefaultencoding()
+            bytes = text.encode(encoding, errors)
+            self.write_bytes(bytes, append)
+        else:
+            if append:
+                mode = 'a'
+            else:
+                mode = 'w'
+            f = self.open(mode)
+            try:
+                f.write(text)
+            finally:
+                f.close()
 
     def lines(self, encoding=None, errors='strict', retain=True):
         """ Open this file, read all lines, return them in a list.
@@ -410,13 +527,38 @@ class path(_base):
         This uses 'U' mode in Python 2.3 and later.
         """
         if encoding is None and retain:
-            f = file(self, _textmode)
+            f = self.open(_textmode)
             try:
                 return f.readlines()
             finally:
                 f.close()
         else:
             return self.text(encoding, errors).splitlines(retain)
+
+    def write_lines(self, lines, encoding=None, errors='strict',
+                    linesep=os.linesep):
+        """ Overwrite this file with the given lines of text.
+
+        lines - A list of strings.
+        encoding - A Unicode encoding to use.  This applies only if
+            'lines' contains any Unicode strings.
+        errors - How to handle errors in Unicode encoding.  This
+            also applies only to Unicode strings.
+        linesep - A character sequence that will be added at the
+            end of every line that doesn't already have it.
+        """
+        f = self.open('wb')
+        try:
+            for line in lines:
+                if not line.endswith(linesep):
+                    line += linesep
+                if isinstance(line, unicode):
+                    if encoding is None:
+                        encoding = sys.getdefaultencoding()
+                    line = line.encode(encoding, errors=errors)
+                f.write(line)
+        finally:
+            f.close()
 
 
     # --- Methods for querying the filesystem.
