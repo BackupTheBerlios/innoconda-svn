@@ -282,9 +282,10 @@ class OrderedDict(dict):
         return k, v
 
 # utilities for processing fmscript with the parser
-def sourceItems(fmscript):
+def sourceItems(fmscript, replaceDuplicates=0):
     """Return only the source files matched by the fmscript"""
     fmp = FileMapperParser()
+    fmp.replaceDuplicates = replaceDuplicates
     [fmp.onecmd(l) for l in fmscript.splitlines()]
     return zip(*fmp.data.items())[0]
 

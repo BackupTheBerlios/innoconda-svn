@@ -5,7 +5,7 @@ from twisted.trial import unittest
 from twisted.python import util
 from twisted.python.zipstream import unzip
 
-from inno.fmlang import FileMapperParser, DuplicateFileException, InvalidDirectoryException
+from inno.fmlang import FileMapperParser, DuplicateFileException, InvalidDirectoryException, sourceItems
 
 class FMLangTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -76,7 +76,7 @@ class FMLangTestCase(unittest.TestCase):
         do("chdir test")
         do("add **/*")
         # __init__ gets moved
-        # because of replaceDuplicaties
+        # because of replaceDuplicates
         lex = list(expected)
         lex.remove('.\\__init__.py')
         expected = tuple(lex)
@@ -130,4 +130,45 @@ Adding new __init__.py in no-replaceDuplicates mode did not raise exception")
         expected = ('.\\dir\\dir2\\x', '.\\dir\\dir2\\y', '.\\dir\\dir2\\z',
                     '.\\dir\\dir3\\1') 
         actual = zip(*fmp2.data.items())[0]
+        self.assertEqual(actual, expected)
+    def test_004sourceItems(self):
+        doscript = '''exclude *.pyc
+add "\'"
+add ' x y z' # spaces!
+exclude  *.pyo
+chdir "%s"
+add LICENSE.* # woo licenses add stuff
+# comment 
+ add *.txt
+  diradd program  
+add **/*.py*
+chdir test
+add **/*
+chdir ../CVS
+add **/* # does this parse ok?
+chdir ../dir
+exclude *dir2*
+add **/*
+unexclude *dir2* 
+exclude [xy]
+add **/*
+
+# show''' % (os.getcwd(), )
+        actual = sourceItems(doscript, replaceDuplicates=1)
+        expected = (".\\'", '.\\ x y z', '.\\LICENSE.inno', 
+                    '.\\LICENSE.innoconda', '.\\LICENSE.process', 
+                    '.\\actual.txt', '.\\files.txt', '.\\output.txt', 
+                    '.\\THIRDPARTY.txt', '.\\TODO.txt', '.\\program\\', 
+                    '.\\fmlang.py', '.\\fmlang.py~', '.\\path.py', 
+                    '.\\process.py', '.\\runner.py', '.\\script.py', 
+                    '.\\version.py', '.\\test\\test_fmlang.py', 
+                    '.\\test\\test_fmlang.py~', '.\\test\\test_inno.py', 
+                    '.\\test\\__init__.py', '.\\test_fmlang.py', 
+                    '.\\test_fmlang.py~', '.\\test_inno.py', 
+                    '.\\__init__.py', '.\\CVS\\Entries', 
+                    '.\\CVS\\Repository', '.\\CVS\\Root', 
+                    '.\\data\\simple.iss', '.\\data\\CVS\\Entries', 
+                    '.\\data\\CVS\\Repository', '.\\data\\CVS\\Root', 
+                    '.\\Entries', '.\\Repository', '.\\Root', '.\\dir3\\1', 
+                    '.\\dir2\\z')
         self.assertEqual(actual, expected)
