@@ -157,15 +157,16 @@ class FileMapperParser(cmd.Cmd):
     """An implementation of the FileMapper command set.  Use
     FileMapperParser.onecmd(s) to issue a command.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, replacements={}, *args, **kwargs):
         cmd.Cmd.__init__(self, *args, **kwargs)
+        self.replacements = replacements
         self.exclusions = []
         self.replaceDuplicates = 0
         self.data = OrderedDict()
         self.cwd = path('.')
 
     def parseline(self, line):
-        line = cleanLine(line)
+        line = cleanLine(line % self.replacements)
         pos = line.find(' ')
         word1 = line[:pos]
         word2 = line[pos+1:]

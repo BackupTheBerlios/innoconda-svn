@@ -172,3 +172,7 @@ add **/*
                     '.\\Entries', '.\\Repository', '.\\Root', '.\\dir3\\1', 
                     '.\\dir2\\z')
         self.assertEqual(actual, expected)
+
+    def test_004ReplacementDict(self):
+        x
+    test_004ReplacementDict.todo = "test a fms with %(strings)s in it"
