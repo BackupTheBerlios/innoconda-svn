@@ -155,13 +155,20 @@ def cleanLine(line):
     sio = StringIO(line)
     lexer = shlex.shlex(sio)
     lexer.wordchars = wordchars
+    #lexer.debug = 1
     gt = lexer.get_token
-    # python 2.2's shlex returns None for EOF, so kludge with {or ''}
+    # in non-posix shlex returns None for EOF, so kludge with {or ''}
+    # try posix?
     cmd, arg = gt() or '', gt() or ''
-    # FIXME - should arg come out quoted, does cmd understand this?
     if len(arg)>=1 and arg[0] in lexer.quotes:
         arg = arg[1:-1]
     return ' '.join((cmd, arg))
+
+def xparseLine(line):
+    pos = line.find(' ')
+    word1 = line[:pos]
+    word2 = line[pos+1:]
+    return word1 or None, word2 or None, line.strip()
 
 class FileMapperParser(cmd.Cmd):
     
@@ -173,7 +180,7 @@ class FileMapperParser(cmd.Cmd):
         self.cwd = path('.')
 
     def parseline(self, line):
-        return cmd.Cmd.parseline(self, cleanLine(line))
+        return xparseLine(cleanLine(line))
 
     def _update(self, dct):
         if not self.replaceDuplicates:
@@ -188,12 +195,12 @@ class FileMapperParser(cmd.Cmd):
         """
         od = OrderedDict(matchesf(self.cwd, glob, self.exclusions))
         self._update(od)
-            
+
     def do_chdir(self, directory):
         """from now on, add all entries relative to this directory"""
         new_cwd = (self.cwd / directory).normpath()
         if not new_cwd.isdir():
-            raise InvalidDirectoryException()
+            raise InvalidDirectoryException(new_cwd)
         self.cwd = new_cwd
     do_cd = do_chdir
     
@@ -234,11 +241,14 @@ class FileMapperParser(cmd.Cmd):
 class DuplicateFileException(Exception):
     def __init__(self, items):
         self.items = items
-    def __str__(self, items):
+    def __str__(self):
         return "Attempt to add different files at the same destination"
 
 class InvalidDirectoryException(Exception):
-    pass
+    def __init__(self, dirname):
+        self.dirname = dirname
+    def __str__(self):
+        return "Tried to change into directory %s which does not exist" % self.dirname
     
 def run():
     fmp = FileMapperParser()
@@ -247,7 +257,7 @@ def run():
             fmp.onecmd(l)
         except DuplicateFileException, e:
             print "Warning: duplicate destination files."
-            templ="Destination: %s  Old Source: %s  New Source: %s"
+            templ="Destination: %s\n  Old Source: %s\n  New Source: %s"
             print "\n".join([templ % i for i in e.items])
             fmp.replaceDuplicates = 1
             fmp.onecmd(l)
