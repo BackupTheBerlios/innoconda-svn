@@ -20,3 +20,6 @@ innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/
                                 destination="{pf}\Innoconda")
         scr.collect("inno", exclude_globs=('.cvsignore', '*CVS','*~'))
         scr.compile()
+
+clean:
+    :del {f} $all_targets innoconda.iss
