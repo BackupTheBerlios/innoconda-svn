@@ -224,6 +224,7 @@ class FileMapperParser(cmd.Cmd):
         
     def do_exclude(self, glob):
         """from now on, don't grab any files that match this glob"""
+        # TODO - this should probably raise an error if glob is missing
         self.exclusions.append(glob)
         
     def do_recurse(self, glob):
@@ -236,6 +237,7 @@ class FileMapperParser(cmd.Cmd):
         
     def do_unexclude(self, glob):
         """stop excluding this glob, if it was previously excluded"""
+        # TODO - this should probably raise an error if glob is missing
         if glob in self.exclusions:
             self.exclusions.remove(glob)
 

@@ -72,7 +72,9 @@ packaged (dirs or files)
         self._base = psrc = path(src)
         assert psrc.isdir()
 
-        do = scr.append()
+        fmp = FileMapperParser()
+        do = fmp.onecmd
+        
         do("chdir %s" % src)
         for xg in exclude_globs:
             do("exclude %s" % xg)
@@ -80,18 +82,14 @@ packaged (dirs or files)
         if recurse and not empties:
             do("recurse")
         elif recurse and empties:
-            do("recurse")
-            do("dirrecurse")
+            do("recurse"); do("dirrecurse")
         elif not recurse and not empties:
             do("add")
         elif not recurse and empties:
-            do("add")
-            do("dir")
+            do("add"); do("dir")
 
-        fmp = FileMapperParser()
-        for command in scr:
-            fmp.onecmd(command)
-
+        # put only the destinations in self.sources, we assume
+        # that everything is relative to _base so we can discard sources
         self.sources = zip(*fmp.data.items())[0]
         
     def writeScript(self, fd):
@@ -125,8 +123,9 @@ OutputDir=%(workdir)s
 
         tmpl = 'Source: "%s"; DestDir: "{app}\%s"; Flags: ignoreversion\n'
         for f in self.sources:
-            if f.isfile():
-                source = self._base.relpathto(f)
+            pf = path(f)
+            if pf.isfile():
+                source = self._base.relpathto(pf)
                 w(tmpl % (source, os.path.dirname(source)))
     
     def _section_Dirs(self, fd):
@@ -135,9 +134,10 @@ OutputDir=%(workdir)s
 
         tmpl = 'Name: "{app}\%s"\n'
         for d in self.sources:
-            if d.isdir():
+            pd = path(d)
+            if pd.isdir():
                 ## FIXME? 2 leading slashes is bad, might have to clean up
-                source = self._base.relpathto(d)
+                source = self._base.relpathto(pd)
                 w(tmpl % source)
 
     def _section_Icons(self, fd):
@@ -189,8 +189,9 @@ NoUninstallWarning=Setup has detected that this package has already been install
 
         tmpl = 'Source: "%s"; DestDir: "{code:SiteLib}\%s"; Flags: ignoreversion\n'
         for f in self.sources:
-            if f.isfile():
-                source = self._base.relpathto(f)
+            pf = path(f)
+            if pf.isfile():
+                source = self._base.relpathto(pf)
                 w(tmpl % (source, os.path.dirname(source)))
 
     def _section_Setup(self, fd):
