@@ -1,6 +1,6 @@
 """File-Mapper language.
 This is a shell-like language used to generate a list of files of the form::
-   source: destination
+   destination: source
 
 It can be used wherever you need to collect files and package them up for
 distribution, and want a sane way to tell Python where files are coming from
@@ -14,7 +14,7 @@ command that does not take a glob, it must take a directory)
 
 The only commands it understands are:
   add
-    grab all files (not subdirectories) in this dir matching the glob
+    grab all filenames (not names of directories) in this dir matching the glob
   chdir (or cd)
     from now on, add all entries relative to this directory
   diradd
@@ -184,7 +184,6 @@ class FileMapperParser(cmd.Cmd):
         return xparseLine(cleanLine(line))
 
     def _update(self, dct):
-        if '__init__.py' in dct: import pdb; pdb.set_trace() ##################
         if not self.replaceDuplicates:
             dupes = [(k,dct[k],self.data[k]) for k in dct if k in self.data]
             if dupes:

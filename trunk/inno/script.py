@@ -9,6 +9,7 @@ import types
 
 # local imports
 from inno.path import path
+from inno.fmlang import FileMapperParser
 import inno
 
 
@@ -66,25 +67,32 @@ several directories.
 packaged (dirs or files)
 @type exclude_globs: iterable
 """
+        scr = []
+        
         self._base = psrc = path(src)
-
         assert psrc.isdir()
 
-        def filtername(pth):
-            for pat in exclude_globs:
-                if pth.fnmatch(pat):
-                    return 0
-            return 1
+        do = scr.append()
+        do("chdir %s" % src)
+        for xg in exclude_globs:
+            do("exclude %s" % xg)
 
-        all_dirs = list(psrc.walkdirs())
-        filtered_dirs = [d for d in all_dirs if filtername(d)]
-        
-        for d in [psrc] + filtered_dirs:
-            all = d.files()
-            filtered = [f for f in all if filtername(f)]
-            self.sources.extend(filtered)
-            if empties and len(filtered) == 0:
-                self.sources.append(d)
+        if recurse and not empties:
+            do("recurse")
+        elif recurse and empties:
+            do("recurse")
+            do("dirrecurse")
+        elif not recurse and not empties:
+            do("add")
+        elif not recurse and empties:
+            do("add")
+            do("dir")
+
+        fmp = FileMapperParser()
+        for command in scr:
+            fmp.onecmd(command)
+
+        self.sources = zip(*fmp.data.items())[0]
         
     def writeScript(self, fd):
         """Serialize script to fd
