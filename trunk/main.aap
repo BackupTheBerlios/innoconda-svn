@@ -7,7 +7,7 @@ version =           `globs['version']`
 @from inno.fmlang import FileMapperParser
 @fmp = FileMapperParser()
 @fm_script = """chdir inno
-@            recurse *.py
+@            add **/*.py
 @            add LICENSE.*
 @            add *.txt
 @            add test/data/test_fmlang.zip

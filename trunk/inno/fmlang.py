@@ -9,7 +9,8 @@ and where they're going.
 * Each command can have exactly one argument.  In some commands the
 argument is optional, in others it is not.
 * Commands that take glob arguments (all but chdir) can use the zsh-like
-glob syntax ** to indicate recursion.
+glob syntax ** to indicate recursion.  **/* matches all files in this
+and subdirectories.
 * Pound (#) may be used to denote comments, as in the Unix shell.
 * Whitespace is ignored
 

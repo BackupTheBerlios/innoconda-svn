@@ -85,13 +85,13 @@ packaged
             do("exclude '%s'" % xg)
 
         if recurse and not empties:
-            do("recurse")
+            do("add **/*")
         elif recurse and empties:
-            do("recurse"); do("dirrecurse")
+            do("add **/*"); do("diradd **/*")
         elif not recurse and not empties:
-            do("add")
+            do("add *")
         elif not recurse and empties:
-            do("add"); do("diradd")
+            do("add *"); do("diradd *")
 
         self.fmscript = '\n'.join(scx)
 
