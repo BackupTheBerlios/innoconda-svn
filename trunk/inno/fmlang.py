@@ -13,19 +13,19 @@ command that does not take a glob, it must take a directory)
 * Whitespace is ignored
 
 The only commands it understands are:
-  add
-    grab all filenames (not names of directories) in this dir matching the glob
-  chdir (or cd)
+  add [<glob>]
+    grab all filenames (not names of directories) in this dir matching glob
+  chdir (or cd) <dir>
     from now on, add all entries relative to this directory
-  diradd
-    add directories matching this glob (not its contents - use for empty dirs)
-  dirrecurse
+  diradd [<glob>]
+    add directories matching glob (not their contents--use for empty dirs)
+  dirrecurse [<glob>]
     add all directories matching this glob, in this dir and subdirectories
-  exclude
-    from now on, don't grab any files that match this glob
-  recurse
+  exclude <glob>
+    from now on, don\'t grab any files that match this glob
+  recurse [<glob>]
     add all files matching this glob, in this dir and subdirectories
-  unexclude
+  unexclude <glob>
     stop excluding this glob, if it was previously excluded
 
 Notes:
@@ -233,6 +233,7 @@ class FileMapperParser(cmd.Cmd):
         """add all files matching this glob, in this dir and subdirectories
         unexclude
         """
+        if glob=='QuotientService': import XXXFIXMEXXX
         if glob in ('', None): glob = '*'
         od = OrderedDict(deepmatchesf(self.cwd, glob, self.exclusions))
         self._update(od)
