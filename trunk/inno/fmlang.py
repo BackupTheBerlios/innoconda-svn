@@ -7,7 +7,8 @@ distribution, and want a sane way to tell Python where files are coming from
 and where they're going.
 * Give commands one per line,
 * consisting of a single word followed by a single file pattern possibly
-containing wildcards, otherwise known as a glob.
+containing wildcards, otherwise known as a glob.  (chdir is the only
+command that does not take a glob, it must take a directory)
 * Pound (#) may be used to denote comments, as in the Unix shell.
 * Whitespace is ignored
 
@@ -67,7 +68,6 @@ The above might produce::
  ('Xsession.options', '/etc/X11/Xsession.options'),
  ('Xwrapper.config',  '/etc/X11/Xwrapper.config')]
 """
-
 import cmd
 import shlex
 from cStringIO import StringIO
@@ -84,6 +84,32 @@ def cleanLine(line):
     # python 2.2's shlex returns None for EOF, so kludge with {or ''}
     return ' '.join((cmd or '', arg or ''))
 
+
+def matches(funk, glob, xglobs=()):
+    """Return the entries that match glob and do not match any xglob"""
+    dn, bn = path(glob).splitpath()
+    entries = getattr(dn, funk)
+    all = entries(glob)
+    for xg in xglobs:
+        all = [f for f in all if f not in entries(xg)]
+    return [(str(dn/f), f.abspath()) for f in all]
+
+matchesf = lambda g, xg=(): matches("files", g, xg)
+matchesd = lambda g, xg=(): matches("dirs", g, xg)
+
+
+def deepmatches(funk, glob, xglobs=()):
+    """Return the entries that match glob and do not match and xglob,
+    searching subdirectories for matches
+    """
+    all = getattr(path('.'), funk)(glob)
+    for xg in xglobs:
+        
+
+deepmatchesf = lambda g, xg=(): deepmatches("walkfiles", g, xg)
+deepmatchesd = lambda g, xg=(): deepmatches("walkdirs", g, xg)
+
+
 class FileMapperParser(cmd.Cmd):
     def __init__(self, *args, **kwargs):
         cmd.Cmd.__init__(self, *args, **kwargs)
@@ -97,14 +123,19 @@ class FileMapperParser(cmd.Cmd):
         """grab all files (not subdirectories) in this dir matching the
         glob
         """
-    def do_chdir(self, glob):
+        self.data.extend(matches(glob, self.exclusions))
+        
+            
+    def do_chdir(self, directory):
         """from now on, add all entries relative to this directory"""
+        os.chdir(directory)
     do_cd = do_chdir
     
     def do_diradd(self, glob):
         """add directories matching this glob (not its contents -
         use for empty dirs)
         """
+        self.e
     def do_dirrecurse(self, glob):
         """add all directories matching this glob, in this dir
         and subdirectories
