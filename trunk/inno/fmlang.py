@@ -73,7 +73,7 @@ The above might produce::
  ('Xsession.options', '/etc/X11/Xsession.options'),
  ('Xwrapper.config',  '/etc/X11/Xwrapper.config')]
 """
-from __future__ import generators
+from itertools import chain
 
 import os
 import cmd
@@ -103,7 +103,7 @@ def gatherHits(curdir, components, xglobs=()):
             matcher = lambda g: chain((here,), here.walkdirs(g))
         else:
             matcher = here.dirs
-    xrelist = []
+    xrelist = [] # list of regular expressions for matching excluded files
     for xg in xglobs:
         cre = re.compile(fnmatch.translate(xg))
         xrelist.append(cre)
@@ -281,7 +281,10 @@ class OrderedDict(dict):
         del self[k]
         return k, v
 
-def chain(*iterables):
-    for iterable in iterables:
-        for item in iterable:
-            yield item
+# utilities for processing fmscript with the parser
+def sourceItems(fmscript):
+    """Return only the source files matched by the fmscript"""
+    fmp = FileMapperParser()
+    [fmp.onecmd(l) for l in fmscript.splitlines()]
+    return zip(*fmp.data.items())[0]
+
