@@ -86,7 +86,7 @@ packaged (dirs or files)
         elif not recurse and not empties:
             do("add")
         elif not recurse and empties:
-            do("add"); do("dir")
+            do("add"); do("diradd")
 
         # put only the destinations in self.sources, we assume
         # that everything is relative to _base so we can discard sources
