@@ -19,7 +19,7 @@ all_targets =       innoconda-$version-setup.exe
 all: $all_targets
     :print :Done with $source
 
-innoconda-$version-setup.exe: innosetup422.zip{fetch = http://twistedmatrix.com/~moonfallen/innosetup422.zip} $(package_files)
+innoconda-$version-setup.exe: innosetup422.zip{fetch = http://pbp.berlios.de/innosetup422.zip} $(package_files)
     :pushdir inno
     :sys unzip -oq ../innosetup422.zip
     :popdir
