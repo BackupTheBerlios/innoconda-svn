@@ -96,13 +96,11 @@ class OrderedDict(dict):
         # Replacing items changes the order, so don't replace items
         if k in self and v==self[k]:
             return
-        r = dict.__setitem__(self, k, v)
+        dict.__setitem__(self, k, v)
         self.order.append(k)
-        return r
     def __delitem__(self, k):
-        r = dict.__delitem__(self, k)
+        dict.__delitem__(self, k)
         self.order.remove(k)
-        return r
     def items(self):
         """Return a list with the dict's items, in order"""
         return [(k, dict.get(self, k)) for k in self.order]
@@ -183,6 +181,7 @@ class FileMapperParser(cmd.Cmd):
         return xparseLine(cleanLine(line))
 
     def _update(self, dct):
+        if '__init__.py' in dct: import pdb; pdb.set_trace() ##################
         if not self.replaceDuplicates:
             dupes = [(k,dct[k],self.data[k]) for k in dct if k in self.data]
             if dupes:
@@ -193,6 +192,7 @@ class FileMapperParser(cmd.Cmd):
         """grab all files (not subdirectories) in this dir matching the
         glob
         """
+        if glob in ('', None): glob = '*'
         od = OrderedDict(matchesf(self.cwd, glob, self.exclusions))
         self._update(od)
 
@@ -208,6 +208,7 @@ class FileMapperParser(cmd.Cmd):
         """add directories matching this glob (not its contents -
         use for empty dirs)
         """
+        if glob in ('', None): glob = '*'
         od = OrderedDict(matchesd(self.cwd, glob, self.exclusions))
         self._update(od)
         
@@ -215,6 +216,7 @@ class FileMapperParser(cmd.Cmd):
         """add all directories matching this glob, in this dir
         and subdirectories
         """
+        if glob in ('', None): glob = '*'
         od = OrderedDict(deepmatchesd(self.cwd, glob, self.exclusions))
         self._update(od)
         
@@ -226,6 +228,7 @@ class FileMapperParser(cmd.Cmd):
         """add all files matching this glob, in this dir and subdirectories
         unexclude
         """
+        if glob in ('', None): glob = '*'
         od = OrderedDict(deepmatchesf(self.cwd, glob, self.exclusions))
         self._update(od)
         
@@ -233,7 +236,13 @@ class FileMapperParser(cmd.Cmd):
         """stop excluding this glob, if it was previously excluded"""
         if glob in self.exclusions:
             self.exclusions.remove(glob)
-        
+
+    def do_show(self, glob):
+        """Return the list"""
+        r = []
+        for d,s in self.data.items():
+            print "%24s: %s" % (d, s)
+
     def emptyline(self):
         """Don't repeat the last command"""
         pass
@@ -249,18 +258,3 @@ class InvalidDirectoryException(Exception):
         self.dirname = dirname
     def __str__(self):
         return "Tried to change into directory %s which does not exist" % self.dirname
-    
-def run():
-    fmp = FileMapperParser()
-    for l in file("files.txt"):
-        try:
-            fmp.onecmd(l)
-        except DuplicateFileException, e:
-            print "Warning: duplicate destination files."
-            templ="Destination: %s\n  Old Source: %s\n  New Source: %s"
-            print "\n".join([templ % i for i in e.items])
-            fmp.replaceDuplicates = 1
-            fmp.onecmd(l)
-            fmp.replaceDuplicates = 0
-            
-    return fmp.data
