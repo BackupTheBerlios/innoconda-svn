@@ -6,9 +6,10 @@ It can be used wherever you need to collect files and package them up for
 distribution, and want a sane way to tell Python where files are coming from
 and where they're going.
 * Give commands one per line,
-* consisting of a single word followed by a single file pattern possibly
-containing wildcards, otherwise known as a glob.  (chdir is the only
-command that does not take a glob, it must take a directory)
+* Each command can have exactly one argument.  In some commands the
+argument is optional, in others it is not.
+* Commands that take glob arguments (all but chdir) can use the zsh-like
+glob syntax ** to indicate recursion.
 * Pound (#) may be used to denote comments, as in the Unix shell.
 * Whitespace is ignored
 
@@ -19,12 +20,10 @@ The only commands it understands are:
     from now on, add all entries relative to this directory
   diradd [<glob>]
     add directories matching glob (not their contents--use for empty dirs)
-  dirrecurse [<glob>]
-    add all directories matching this glob, in this dir and subdirectories
   exclude <glob>
     from now on, don\'t grab any files that match this glob
-  recurse [<glob>]
-    add all files matching this glob, in this dir and subdirectories
+  show
+    print the current list of dest:source mappings to stdout
   unexclude <glob>
     stop excluding this glob, if it was previously excluded
 
@@ -72,6 +71,8 @@ The above might produce::
  ('Xsession.options', '/etc/X11/Xsession.options'),
  ('Xwrapper.config',  '/etc/X11/Xwrapper.config')]
 """
+from __future__ import generators
+
 import os
 import cmd
 import shlex
@@ -125,32 +126,59 @@ class OrderedDict(dict):
         del self[k]
         return k, v
 
-def matches(funk, curdir, glob, xglobs=()):
+def chain(*iterables):
+    for iterable in iterables:
+        for item in iterable:
+            yield item
+
+def gatherHits(curdir, components, xglobs=()):
+    if len(components)==0:
+        return []
+    gathered = OrderedDict()
+    add = lambda d,s: gathered.__setitem__(str(d), str(s))
+    here = path(curdir)
+    comp = path(components.pop(0))
+    # the rule is:
+    # 1. normal globs match files or dirs in the current directory
+    # 2. ** recursive globs match any dir in the subtree including '.'
+    # 3. unless there are no components left to process, in which case
+    #    treat as a normal glob.
+    if len(components)==0:
+        matcher = here.listdir
+    else:
+        if str(comp)=='**':
+            matcher = lambda g: chain((here,), here.walkdirs(g))
+        else:
+            matcher = here.dirs
+    xrelist = []
+    for xg in xglobs:
+        cre = re.compile(fnmatch.translate(xg))
+        xrelist.append(cre)
+    for f in matcher(comp):
+        # filter with xglobs
+        for xg, xg_re in zip(xglobs, xrelist):
+            if re.match(xg_re, f) or f.fnmatch(xg):
+                break
+            add(f, f.abspath())
+            if f.isdir():
+                for d, s in gatherHits(f, components[:], xglobs):
+                    add(d,s)
+    return gathered.items()
+    
+    
+
+def matches(curdir, glob, xglobs=()):
     """Return the entries that match glob and do not match any xglob"""
     old = os.getcwd()
     os.chdir(curdir)
     try:
-        dn, bn = path(glob).splitpath()
-        dn = dn or path('.') # '' is not a valid dir, so replace with '.'
-        all = getattr(dn, funk)(bn)
-        allcopy = list(all)
-        for xg in xglobs:
-            # recreating the re every time is probably slow, but I
-            # resist the urge to prematurely optimize!
-            xg_re = fnmatch.translate(xg)
-            for f in allcopy[:]:
-                if re.match(xg_re, f) or f.fnmatch(xg):
-                    allcopy.remove(f)
-        return [(str(f)+ os.sep * f.isdir(), # add a slash to dirs
-                str(f.abspath())) for f in allcopy
-                ]
+        # sanity check.. make sure glob uses os.sep
+        if glob in ('', None): glob = '*'
+        glob = path(glob).normpath()
+        components = str(glob).split(os.sep)
+        return gatherHits('.', components, xglobs)
     finally:
         os.chdir(old)
-
-matchesf = lambda cwd, g, xg=(): matches("files", cwd, g, xg)
-matchesd = lambda cwd, g, xg=(): matches("dirs", cwd, g, xg)
-deepmatchesf = lambda cwd, g, xg=(): matches("walkfiles", cwd, g, xg)
-deepmatchesd = lambda cwd, g, xg=(): matches("walkdirs", cwd, g, xg)
 
 wordchars = ''.join([chr(n) for n in range(255)
                      if n not in (9,10,13,32,34,39)])
@@ -170,7 +198,9 @@ def cleanLine(line):
 
 
 class FileMapperParser(cmd.Cmd):
-    
+    """An implementation of the FileMapper command set.  Use
+    FileMapperParser.onecmd(s) to issue a command.
+    """
     def __init__(self, *args, **kwargs):
         cmd.Cmd.__init__(self, *args, **kwargs)
         self.exclusions = []
@@ -196,9 +226,9 @@ class FileMapperParser(cmd.Cmd):
         """grab all files (not subdirectories) in this dir matching the
         glob
         """
-        if glob in ('', None): glob = '*'
-        od = OrderedDict(matchesf(self.cwd, glob, self.exclusions))
-        self._update(od)
+        hits = matches(self.cwd, glob, self.exclusions)
+        [hits.remove(x) for x in hits[:] if path(x[1]).isdir()]
+        self._update(OrderedDict(hits))
 
     def do_chdir(self, directory):
         """from now on, add all entries relative to this directory"""
@@ -212,31 +242,17 @@ class FileMapperParser(cmd.Cmd):
         """add directories matching this glob (not its contents -
         use for empty dirs)
         """
-        if glob in ('', None): glob = '*'
-        od = OrderedDict(matchesd(self.cwd, glob, self.exclusions))
-        self._update(od)
-        
-    def do_dirrecurse(self, glob):
-        """add all directories matching this glob, in this dir
-        and subdirectories
-        """
-        if glob in ('', None): glob = '*'
-        od = OrderedDict(deepmatchesd(self.cwd, glob, self.exclusions))
-        self._update(od)
+        hits = []
+        for m in matches(self.cwd, glob, self.exclusions):
+            hits.append((m[0] + os.sep, m[1]))
+        [hits.remove(x) for x in hits[:] if path(x[1]).isfile()]
+        self._update(OrderedDict(hits))
         
     def do_exclude(self, glob):
         """from now on, don't grab any files that match this glob"""
         # TODO - this should probably raise an error if glob is missing
         self.exclusions.append(glob)
-        
-    def do_recurse(self, glob):
-        """add all files matching this glob, in this dir and subdirectories
-        unexclude
-        """
-        if glob in ('', None): glob = '*'
-        od = OrderedDict(deepmatchesf(self.cwd, glob, self.exclusions))
-        self._update(od)
-        
+
     def do_unexclude(self, glob):
         """stop excluding this glob, if it was previously excluded"""
         # TODO - this should probably raise an error if glob is missing
