@@ -18,5 +18,5 @@ Innoconda-$version-setup.exe: innosetup409.zip{fetch = http://twistedmatrix.com/
                           name="innoconda",
                           package_version=_no.version,
                           destination="{code:PythonDir}\inno")
-        scr.collect("inno")
+        scr.collect("inno", exclude_globs=('*CVS',))
         scr.compile()
