@@ -18,7 +18,7 @@ class FMLangTestCase(unittest.TestCase):
         self.fmp.replaceDuplicates = 1
         do = self.fmp.onecmd
         ckitems = lambda : zip(*self.fmp.data.items())[0]
-        expected = [".\\'", # 0   "'" 
+        expected = (".\\'", # 0   "'" 
                     '.\\ x y z', # 1  " x y z"
                     '.\\LICENSE.inno', # 2 LICENSE.*
                     '.\\LICENSE.innoconda', # 3
@@ -56,10 +56,10 @@ class FMLangTestCase(unittest.TestCase):
                     '.\\Repository', # 34
                     '.\\Root', # 35
                     '.\\dir3\\1', # 36 **/* in dir, exclude dir2
-                    '.\\dir2\\z'] # 37 **/* in dir, include dir2
+                    '.\\dir2\\z') # 37 **/* in dir, include dir2
         do('exclude *.pyc')
         do('add "\'"')
-        self.assertEqual(expected[:1], ckitems())
+        self.assertEqual(expected[:1], ckitems()[:1])
         do("add ' x y z' # spaces!")
         self.assertEqual(expected[1:2], ckitems()[1:2])
         do("exclude  *.pyo")
@@ -77,7 +77,9 @@ class FMLangTestCase(unittest.TestCase):
         do("add **/*")
         # __init__ gets moved
         # because of replaceDuplicaties
-        expected.remove('.\\__init__.py')
+        lex = list(expected)
+        lex.remove('.\\__init__.py')
+        expected = tuple(lex)
         self.assertEqual(expected[22:33], ckitems()[22:33])
         do("chdir ../CVS")
         do("add **/* # does this parse ok?")
