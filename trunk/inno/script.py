@@ -140,7 +140,7 @@ OutputDir=%(workdir)s
 
         tmpl = 'Name: "{app}\%s"\n'
         for dest, src in self.sources:
-            if path(dest).isdir():
+            if path(src).isdir():
                 w(tmpl % dest)
 
     def _section_Icons(self, fd):
