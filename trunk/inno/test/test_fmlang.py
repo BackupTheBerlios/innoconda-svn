@@ -18,45 +18,45 @@ class FMLangTestCase(unittest.TestCase):
         self.fmp.replaceDuplicates = 1
         do = self.fmp.onecmd
         ckitems = lambda : zip(*self.fmp.data.items())[0]
-        expected =(".\\'",
-                   '.\\ x y z',
-                   '.\\LICENSE.inno',
-                   '.\\LICENSE.innoconda',
-                   '.\\LICENSE.process',
-                   '.\\actual.txt',
-                   '.\\files.txt',
-                   '.\\output.txt',
-                   '.\\THIRDPARTY.txt',
-                   '.\\TODO.txt',
-                   '.\\program\\',
-                   '.\\fmlang.py',
-                   '.\\fmlang.py~',
-                   '.\\path.py',
-                   '.\\process.py',
-                   '.\\runner.py',
-                   '.\\script.py',
-                   '.\\version.py',
-                   '.\\__init__.py',
-                   '.\\test\\test_fmlang.py',
-                   '.\\test\\test_fmlang.py~',
-                   '.\\test\\test_inno.py',
-                   '.\\test\\__init__.py',
-                   '.\\CVS\\Entries',
-                   '.\\CVS\\Repository',
-                   '.\\CVS\\Root',
-                   '.\\data\\CVS\\Entries',
-                   '.\\data\\CVS\\Repository',
-                   '.\\data\\CVS\\Root',
-                   '.\\data\\simple.iss',
-                   '.\\test_fmlang.py',
-                   '.\\test_fmlang.py~',
-                   '.\\test_inno.py',
-                   '.\\__init__.py',
-                   '.\\Entries',
-                   '.\\Repository',
-                   '.\\Root',
-                   '.\\dir3\\1',
-                   '.\\dir2\\z')
+        expected = [".\\'", # 0   "'" 
+                    '.\\ x y z', # 1  " x y z"
+                    '.\\LICENSE.inno', # 2 LICENSE.*
+                    '.\\LICENSE.innoconda', # 3
+                    '.\\LICENSE.process', # 4
+                    '.\\actual.txt', # 5 *.txt
+                    '.\\files.txt', # 6 
+                    '.\\output.txt', # 7
+                    '.\\THIRDPARTY.txt', # 8
+                    '.\\TODO.txt', # 9
+                    '.\\program\\', # 10 diradd program
+                    '.\\fmlang.py', # 11  **/*.py*
+                    '.\\fmlang.py~', # 12 
+                    '.\\path.py', # 13
+                    '.\\process.py', # 14
+                    '.\\runner.py', # 15
+                    '.\\script.py', # 16
+                    '.\\version.py', # 17
+                    '.\\__init__.py', # gets deleted!
+                    '.\\test\\test_fmlang.py', # 18
+                    '.\\test\\test_fmlang.py~', # 19
+                    '.\\test\\test_inno.py', # 20
+                    '.\\test\\__init__.py', # 21
+                    '.\\test_fmlang.py', # 22 **/* (in test)
+                    '.\\test_fmlang.py~', # 23
+                    '.\\test_inno.py', # 24
+                    '.\\__init__.py', # 25
+                    '.\\CVS\\Entries', # 26
+                    '.\\CVS\\Repository', # 27
+                    '.\\CVS\\Root', # 28
+                    '.\\data\\simple.iss', # 29
+                    '.\\data\\CVS\\Entries', # 30
+                    '.\\data\\CVS\\Repository', # 31
+                    '.\\data\\CVS\\Root', # 32
+                    '.\\Entries', # 33 **/* (in CVS)
+                    '.\\Repository', # 34
+                    '.\\Root', # 35
+                    '.\\dir3\\1', # 36 **/* in dir, exclude dir2
+                    '.\\dir2\\z'] # 37 **/* in dir, include dir2
         do('exclude *.pyc')
         do('add "\'"')
         self.assertEqual(expected[:1], ckitems())
@@ -72,20 +72,23 @@ class FMLangTestCase(unittest.TestCase):
         do("  diradd program  ")
         self.assertEqual(expected[10:11], ckitems()[10:11])
         do("add **/*.py*")
-        self.assertEqual(expected[11:22], ckitems()[11:22])
+        self.assertEqual(expected[11:23], ckitems()[11:23])
         do("chdir test")
-        do("add **")
+        do("add **/*")
+        # __init__ gets moved
+        # because of replaceDuplicaties
+        expected.remove('.\\__init__.py')
         self.assertEqual(expected[22:33], ckitems()[22:33])
         do("chdir ../CVS")
-        do("add ** # does this parse ok?")
+        do("add **/* # does this parse ok?")
         self.assertEqual(expected[33:36], ckitems()[33:36])
         do("chdir ../dir")
         do("exclude *dir2*")
-        do("add **")
-        self.assertEqual(expected[36:37], ckitems()[36:37])
+        do("add **/*")
+        self.assertEqual(expected[33:37], ckitems()[33:37])
         do("unexclude *dir2* ")
         do("exclude [xy]")
-        do("add **")
+        do("add **/*")
         do("")
         do("# show")
         self.assertEqual(expected[37:38], ckitems()[37:38])

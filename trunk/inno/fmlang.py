@@ -29,22 +29,23 @@ The only commands it understands are:
 
 Notes:
 
-1. The file argument is optional for "(dir)add", "(dir)recurse".  This is
-identical to "(dir)add *" and "(dir)recurse *", respectively.
+1. The file argument is optional for "(dir)add".  This is identical to
+"(dir)add *".
 
-2. "diradd" and "dirrecurse" are distinct from add and recurse because they
-are only needed when you have empty directories to add.  "add" and "recurse"
-keep the directory structure but only add the files.
+2. "diradd" is distinct from add because it is only needed when you
+have empty directories to add.  "add" keeps the directory structure
+but only adds the files.
 
-3. Shell matching of hidden files (named with a leading dot) does not
+3. Shell ignoring of hidden files (named with a leading dot) does not
 apply: * matches them.  Use "exclude .*" to exclude them.
 
 4. The first quoted word after the command is taken as the glob pattern, and
 everything after it is ignored.  Add quotes around patterns containing spaces.
 
-5. The contents of the "current directory" (the argument to "chdir") are added
-at the root level of the mapping.  To add a directory in a subdirectory, use
-"add subdir/file", NOT "chdir subdir" followed by "add file".
+5. The contents of the "current directory" (the argument to "chdir")
+are added at the root level of the mapping.  To add make source file
+in a subdirectory of the destination, use "add subdir/file", NOT
+"chdir subdir" followed by "add file".
 
 6. If replaceDuplicates==1, silently replace duplicate destination files with
 new source files.  If replaceDuplicates==0 (default), raise an exception when
@@ -81,55 +82,6 @@ import re
 import fnmatch
 
 from inno.path import path
-
-
-class OrderedDict(dict):
-    """A dict which you can access in order through items() or popitem().
-    Supports all normal dict operations, but keep in mind that if you update()
-    it from a regular (non-ordered) dict, the new items will not be in any
-    order (but will follow all the old items). Updating from another
-    OrderedDict will preserve the order of both dicts.
-    """
-    def __init__(self, t=()):
-        self.order = []
-        for k, v in t:
-            self[k] = v
-        
-    def __setitem__(self, k, v): 
-        # Replacing items with the same value changes the order, so don't
-        # replace items 
-        if k in self.keys() and v==self[k]:
-            return
-        dict.__setitem__(self, k, v)
-        if k in self.order:
-            self.order.remove(k)
-        self.order.append(k)
-    def __delitem__(self, k):
-        dict.__delitem__(self, k)
-        self.order.remove(k)
-    def items(self):
-        """Return a list with the dict's items, in order"""
-        return [(k, dict.get(self, k)) for k in self.order]
-    def copy(self):
-        new1 = WhinyOrderedDict()
-        for k, v in self.items():
-            new1[k] = v
-        return new1
-    def update(self, d):
-        for k,v in d.items(): self[k] = v
-    def clear(self):
-        r = dict.clear(self)
-        self.order = []
-        return r
-    def popitem(self):
-        k, v = self.items()[0]
-        del self[k]
-        return k, v
-
-def chain(*iterables):
-    for iterable in iterables:
-        for item in iterable:
-            yield item
 
 def gatherHits(curdir, components, xglobs=()):
     if len(components)==0:
@@ -280,3 +232,52 @@ class InvalidDirectoryException(Exception):
         self.dirname = dirname
     def __str__(self):
         return "Tried to change into directory %s which does not exist" % self.dirname
+
+
+class OrderedDict(dict):
+    """A dict which you can access in order through items() or popitem().
+    Supports all normal dict operations, but keep in mind that if you update()
+    it from a regular (non-ordered) dict, the new items will not be in any
+    order (but will follow all the old items). Updating from another
+    OrderedDict will preserve the order of both dicts.
+    """
+    def __init__(self, t=()):
+        self.order = []
+        for k, v in t:
+            self[k] = v
+        
+    def __setitem__(self, k, v): 
+        # Replacing items with the same value changes the order, so don't
+        # replace items 
+        if k in self.keys() and v==self[k]:
+            return
+        dict.__setitem__(self, k, v)
+        if k in self.order:
+            self.order.remove(k)
+        self.order.append(k)
+    def __delitem__(self, k):
+        dict.__delitem__(self, k)
+        self.order.remove(k)
+    def items(self):
+        """Return a list with the dict's items, in order"""
+        return [(k, dict.get(self, k)) for k in self.order]
+    def copy(self):
+        new1 = WhinyOrderedDict()
+        for k, v in self.items():
+            new1[k] = v
+        return new1
+    def update(self, d):
+        for k,v in d.items(): self[k] = v
+    def clear(self):
+        r = dict.clear(self)
+        self.order = []
+        return r
+    def popitem(self):
+        k, v = self.items()[0]
+        del self[k]
+        return k, v
+
+def chain(*iterables):
+    for iterable in iterables:
+        for item in iterable:
+            yield item
