@@ -123,7 +123,7 @@ class FileMapperParser(cmd.Cmd):
         """grab all files (not subdirectories) in this dir matching the
         glob
         """
-        self.data.extend(matches(glob, self.exclusions))
+        self.data.extend(matchesf(glob, self.exclusions))
         
             
     def do_chdir(self, directory):
@@ -135,18 +135,24 @@ class FileMapperParser(cmd.Cmd):
         """add directories matching this glob (not its contents -
         use for empty dirs)
         """
-        self.e
+        self.data.extend(matchesd(glob, self.exclusions)
+        
     def do_dirrecurse(self, glob):
         """add all directories matching this glob, in this dir
         and subdirectories
         """
+        self.data.extend(deepmatchesd(glob, self.exclusions)
+        
     def do_exclude(self, glob):
         """from now on, don't grab any files that match this glob"""
         self.exclusions.append(glob)
+        
     def do_recurse(self, glob):
         """add all files matching this glob, in this dir and subdirectories
         unexclude
         """
+        self.data.extend(deepmatchesf(glob, self.exclusions))
+        
     def do_unexclude(self, glob):
         """stop excluding this glob, if it was previously excluded"""
         if glob in self.exclusions:
