@@ -47,6 +47,10 @@ everything after it is ignored.  Add quotes around patterns containing spaces.
 at the root level of the mapping.  To add a directory in a subdirectory, use
 "add subdir/file", NOT "chdir subdir" followed by "add file".
 
+6. If replaceDuplicates==1, silently replace duplicate destination files with
+new source files.  If replaceDuplicates==0 (default), raise an exception when
+two different source files are added for the same destination file.
+
 Example::
   chdir /etc
   exclude *i*
@@ -68,80 +72,144 @@ The above might produce::
  ('Xsession.options', '/etc/X11/Xsession.options'),
  ('Xwrapper.config',  '/etc/X11/Xwrapper.config')]
 """
+import os
 import cmd
 import shlex
 from cStringIO import StringIO
 
 from inno.path import path
 
+
+class OrderedDict(dict):
+    """A dict which you can access in order through items() or popitem().
+    Supports all normal dict operations, but keep in mind that if you update()
+    it from a regular (non-ordered) dict, the new items will not be in any
+    order (but will follow all the old items). Updating from another
+    OrderedDict will preserve the order of both dicts.
+    """
+    def __init__(self, t=()):
+        self.order = []
+        for k, v in t:
+            self[k] = v
+        
+    def __setitem__(self, k, v):
+        # Replacing items changes the order, so don't replace items
+        if k in self and v==self[k]:
+            return
+        r = dict.__setitem__(self, k, v)
+        self.order.append(k)
+        return r
+    def __delitem__(self, k):
+        r = dict.__delitem__(self, k)
+        self.order.remove(k)
+        return r
+    def items(self):
+        """Return a list with the dict's items, in order"""
+        return [(k, dict.get(self, k)) for k in self.order]
+    def copy(self):
+        new1 = WhinyOrderedDict()
+        for k, v in self.items():
+            new1[k] = v
+        return new1
+    def update(self, d):
+        for k,v in d.items(): self[k] = v
+    def clear(self):
+        r = dict.clear(self)
+        self.order = []
+        return r
+    def popitem(self):
+        k, v = self.items()[0]
+        del self[k]
+        return k, v
+
+
+def matches(funk, curdir, glob, xglobs=()):
+    """Return the entries that match glob and do not match any xglob"""
+    old = os.getcwd()
+    os.chdir(curdir)
+    try:
+        dn, bn = path(glob).splitpath()
+        dn = dn or path('.') # '' is not a valid dir, so replace with '.'
+        all = getattr(dn, funk)(bn)
+        allcopy = list(all)
+        for xg in xglobs:
+            for f in allcopy[:]:
+                if f.fnmatch(xg):
+                    allcopy.remove(f)
+        return [(str(f)+ os.sep * f.isdir(), # add a slash to dirs
+                str(f.abspath())) for f in allcopy
+                ]
+    finally:
+        os.chdir(old)
+
+matchesf = lambda cwd, g, xg=(): matches("files", cwd, g, xg)
+matchesd = lambda cwd, g, xg=(): matches("dirs", cwd, g, xg)
+deepmatchesf = lambda cwd, g, xg=(): matches("walkfiles", cwd, g, xg)
+deepmatchesd = lambda cwd, g, xg=(): matches("walkdirs", cwd, g, xg)
+
+wordchars = ''.join([chr(n) for n in range(255)
+                     if n not in (9,10,13,32,34,39)])
+
 def cleanLine(line):
     """pass line through shlex to get rid of comments and extra args"""
     sio = StringIO(line)
-    gt = shlex.shlex(sio).get_token
-    cmd, arg = gt(), gt()
-    if arg[0] in ('"', "'"):
-        arg = arg[1:-1]
+    lexer = shlex.shlex(sio)
+    lexer.wordchars = wordchars
+    gt = lexer.get_token
     # python 2.2's shlex returns None for EOF, so kludge with {or ''}
-    return ' '.join((cmd or '', arg or ''))
-
-
-def matches(funk, glob, xglobs=()):
-    """Return the entries that match glob and do not match any xglob"""
-    dn, bn = path(glob).splitpath()
-    entries = getattr(dn, funk)
-    all = entries(glob)
-    for xg in xglobs:
-        all = [f for f in all if f not in entries(xg)]
-    return [(str(dn/f), f.abspath()) for f in all]
-
-matchesf = lambda g, xg=(): matches("files", g, xg)
-matchesd = lambda g, xg=(): matches("dirs", g, xg)
-
-
-def deepmatches(funk, glob, xglobs=()):
-    """Return the entries that match glob and do not match and xglob,
-    searching subdirectories for matches
-    """
-    all = getattr(path('.'), funk)(glob)
-    for xg in xglobs:
-        
-
-deepmatchesf = lambda g, xg=(): deepmatches("walkfiles", g, xg)
-deepmatchesd = lambda g, xg=(): deepmatches("walkdirs", g, xg)
-
+    cmd, arg = gt() or '', gt() or ''
+    # FIXME - should arg come out quoted, does cmd understand this?
+    if len(arg)>=1 and arg[0] in lexer.quotes:
+        arg = arg[1:-1]
+    return ' '.join((cmd, arg))
 
 class FileMapperParser(cmd.Cmd):
+    
     def __init__(self, *args, **kwargs):
         cmd.Cmd.__init__(self, *args, **kwargs)
-        self.data = []
         self.exclusions = []
-        
+        self.replaceDuplicates = 0
+        self.data = OrderedDict()
+        self.cwd = path('.')
+
     def parseline(self, line):
         return cmd.Cmd.parseline(self, cleanLine(line))
+
+    def _update(self, dct):
+        if not self.replaceDuplicates:
+            dupes = [(k,dct[k],self.data[k]) for k in dct if k in self.data]
+            if dupes:
+                raise DuplicateFileException(dupes)
+        self.data.update(dct)
 
     def do_add(self, glob):
         """grab all files (not subdirectories) in this dir matching the
         glob
         """
-        self.data.extend(matchesf(glob, self.exclusions))
-        
+        od = OrderedDict(matchesf(self.cwd, glob, self.exclusions))
+        self._update(od)
             
     def do_chdir(self, directory):
         """from now on, add all entries relative to this directory"""
-        os.chdir(directory)
+        new_cwd = (self.cwd / directory).normpath()
+        if not new_cwd.isdir():
+            raise InvalidDirectoryException()
+        self.cwd = new_cwd
     do_cd = do_chdir
     
     def do_diradd(self, glob):
         """add directories matching this glob (not its contents -
         use for empty dirs)
         """
-        self.data.extend(matchesd(glob, self.exclusions)
+        od = OrderedDict(matchesd(self.cwd, glob, self.exclusions))
+        self._update(od)
         
     def do_dirrecurse(self, glob):
         """add all directories matching this glob, in this dir
         and subdirectories
         """
-        self.data.extend(deepmatchesd(glob, self.exclusions)
+        od = OrderedDict(deepmatchesd(self.cwd, glob, self.exclusions))
+        self._update(od)
         
     def do_exclude(self, glob):
         """from now on, don't grab any files that match this glob"""
@@ -151,7 +219,8 @@ class FileMapperParser(cmd.Cmd):
         """add all files matching this glob, in this dir and subdirectories
         unexclude
         """
-        self.data.extend(deepmatchesf(glob, self.exclusions))
+        od = OrderedDict(deepmatchesf(self.cwd, glob, self.exclusions))
+        self._update(od)
         
     def do_unexclude(self, glob):
         """stop excluding this glob, if it was previously excluded"""
@@ -163,4 +232,25 @@ class FileMapperParser(cmd.Cmd):
         pass
 
 class DuplicateFileException(Exception):
+    def __init__(self, items):
+        self.items = items
+    def __str__(self, items):
+        return "Attempt to add different files at the same destination"
+
+class InvalidDirectoryException(Exception):
     pass
+    
+def run():
+    fmp = FileMapperParser()
+    for l in file("files.txt"):
+        try:
+            fmp.onecmd(l)
+        except DuplicateFileException, e:
+            print "Warning: duplicate destination files."
+            templ="Destination: %s  Old Source: %s  New Source: %s"
+            print "\n".join([templ % i for i in e.items])
+            fmp.replaceDuplicates = 1
+            fmp.onecmd(l)
+            fmp.replaceDuplicates = 0
+            
+    return fmp.data
