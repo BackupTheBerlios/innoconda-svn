@@ -87,7 +87,7 @@ class FMLangTestCase(unittest.TestCase):
         do("chdir ../dir")
         do("exclude *dir2*")
         do("add **/*")
-        self.assertEqual(expected[33:37], ckitems()[33:37])
+        self.assertEqual(expected[36:37], ckitems()[36:37])
         do("unexclude *dir2* ")
         do("exclude [xy]")
         do("add **/*")
@@ -120,14 +120,14 @@ Adding new __init__.py in no-replaceDuplicates mode did not raise exception")
         """
         fmp1 = FileMapperParser()
         fmp1.onecmd("chdir dir")
-        fmp1.onecmd("add dir2/**")
+        fmp1.onecmd("add dir2/**/*")
         expected = ('.\\dir2\\x', '.\\dir2\\y', '.\\dir2\\z')
         actual = zip(*fmp1.data.items())[0]
         self.assertEqual(actual, expected)
         
         fmp2 = FileMapperParser()
-        fmp2.onecmd("add dir/dir*/**")
-        expected = ('.dir\\\\dir2\\x', '.dir\\\\dir2\\y', '.\\dir\\dir2\\z',
+        fmp2.onecmd("add dir/dir*/**/*")
+        expected = ('.\\dir\\dir2\\x', '.\\dir\\dir2\\y', '.\\dir\\dir2\\z',
                     '.\\dir\\dir3\\1') 
         actual = zip(*fmp2.data.items())[0]
         self.assertEqual(actual, expected)

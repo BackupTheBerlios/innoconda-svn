@@ -107,10 +107,13 @@ def gatherHits(curdir, components, xglobs=()):
         cre = re.compile(fnmatch.translate(xg))
         xrelist.append(cre)
     for f in matcher(comp):
+        excluded = 0
         # filter with xglobs
         for xg, xg_re in zip(xglobs, xrelist):
             if re.match(xg_re, f) or f.fnmatch(xg):
+                excluded = 1
                 break
+        if not excluded:
             add(f, f.abspath())
             if f.isdir():
                 for d, s in gatherHits(f, components[:], xglobs):
